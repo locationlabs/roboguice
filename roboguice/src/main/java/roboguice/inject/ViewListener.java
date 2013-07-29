@@ -167,11 +167,14 @@ public class ViewListener implements TypeListener {
             try {
                 final InjectView injectView = (InjectView) annotation;
                 final int id = injectView.value();
+                final String id_string = injectView.id();
 
                 if( id>=0 )
                     view = fragmentClass!=null && fragmentClass.isInstance(activityOrFragment) ? ((View)fragmentGetViewMethod.invoke(activityOrFragment)).findViewById(id) : ((Activity)activityOrFragment).findViewById(id);
 
-                else
+                else if(!id_string.equals("") && (fragmentClass==null || !fragmentClass.isInstance(activityOrFragment))) 
+                   view = ((Activity)activityOrFragment).findViewById(getIdStringView((Activity)activityOrFragment, injectView.id()));
+                else 
                     view = fragmentClass!=null && fragmentClass.isInstance(activityOrFragment) ? ((View)fragmentGetViewMethod.invoke(activityOrFragment)).findViewWithTag(injectView.tag()) : ((Activity)activityOrFragment).getWindow().getDecorView().findViewWithTag(injectView.tag());
 
 
@@ -180,6 +183,9 @@ public class ViewListener implements TypeListener {
 
                 field.setAccessible(true);
                 field.set(instance, view);
+
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
 
             } catch (IllegalAccessException e) {
                 throw new RuntimeException(e);
@@ -192,6 +198,23 @@ public class ViewListener implements TypeListener {
                         field.getType(), field.getName()), f);
             }
         }
+
+       protected int getIdStringView(Context context, String name) throws ClassNotFoundException, IllegalAccessException {
+          String pkg = context.getPackageName();
+          Class R = Class.forName(pkg+".R$id");
+          return getResId(name, context, R);
+       }
+
+       public static int getResId(String variableName, Context context, Class<?> c) throws IllegalAccessException {
+          try {
+             Field idField = c.getDeclaredField(variableName);
+             return idField.getInt(idField);
+          
+          } catch (NoSuchFieldException e) {
+             // will be caught by nullable check
+             return -1;
+          } 
+       }
 
         /**
          * This is when the view references are actually evaluated.

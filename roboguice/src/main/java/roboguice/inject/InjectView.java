@@ -46,4 +46,5 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 public @interface InjectView {
     int value() default -1;
     String tag() default "";
+    String id() default "";
 }
