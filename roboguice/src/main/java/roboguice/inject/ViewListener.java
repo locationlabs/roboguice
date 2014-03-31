@@ -18,6 +18,7 @@ package roboguice.inject;
 import android.app.Activity;
 import android.content.Context;
 import android.view.View;
+import android.util.Log;
 
 import com.google.inject.MembersInjector;
 import com.google.inject.Provider;
@@ -34,6 +35,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.WeakHashMap;
+import android.view.View;
 
 @Singleton
 public class ViewListener implements TypeListener {
@@ -112,11 +114,22 @@ public class ViewListener implements TypeListener {
          * @param instance the instance being injected by guice
          */
         public void injectMembers(T instance) {
+           Log.d("XXX", "injectMembers "+instance.getClass().getName());
             synchronized (ViewMembersInjector.class) {
                 final Activity activity = activityProvider.get();
-                final Object key = fragmentClass!=null && fragmentClass.isInstance(instance) ? instance : activity;
-                if( key==null )
+                Object key = null;
+                if(fragmentClass!=null && fragmentClass.isInstance(instance))
+                   key = instance;
+                else if(instance instanceof roboguice.util.RoboContext)
+                   key = instance;
+                else
+                   key = activity;
+
+                if( key==null ) {
+                   Log.d("XXX", "key is null");
                     return;
+                } 
+                Log.d("XXX", "key is "+key);
 
                 // Add a view injector for the key
                 ArrayList<ViewMembersInjector<?>> injectors = viewMembersInjectors.get(key);
@@ -126,14 +139,12 @@ public class ViewListener implements TypeListener {
                 }
                 injectors.add(this);
 
-
-
-
                 this.instanceRef = new WeakReference<T>(instance);
             }
         }
         
         public void reallyInjectMembers( Object activityOrFragment ) {
+           Log.d("XXX", "reallyInjectMembers");
             if( annotation instanceof InjectView )
                 reallyInjectMemberViews(activityOrFragment);
             else
@@ -155,7 +166,9 @@ public class ViewListener implements TypeListener {
          */
         protected void reallyInjectMemberViews(Object activityOrFragment) {
 
+
             final T instance = fragmentClass!=null && fragmentClass.isInstance(activityOrFragment) ? (T)activityOrFragment : instanceRef.get();
+            Log.d("XXX", "INSTANCE is "+instance);
             if( instance==null )
                 return;
 
@@ -166,18 +179,20 @@ public class ViewListener implements TypeListener {
 
             try {
                 final InjectView injectView = (InjectView) annotation;
-                final int id = injectView.value();
-                final String id_string = injectView.id();
 
-                if( id>=0 )
-                    view = fragmentClass!=null && fragmentClass.isInstance(activityOrFragment) ? ((View)fragmentGetViewMethod.invoke(activityOrFragment)).findViewById(id) : ((Activity)activityOrFragment).findViewById(id);
-
-                else if(!id_string.equals("") && (fragmentClass==null || !fragmentClass.isInstance(activityOrFragment))) 
-                   view = ((Activity)activityOrFragment).findViewById(getIdStringView((Activity)activityOrFragment, injectView.id()));
-                else 
-                    view = fragmentClass!=null && fragmentClass.isInstance(activityOrFragment) ? ((View)fragmentGetViewMethod.invoke(activityOrFragment)).findViewWithTag(injectView.tag()) : ((Activity)activityOrFragment).getWindow().getDecorView().findViewWithTag(injectView.tag());
-
-
+                if(fragmentClass!=null && fragmentClass.isInstance(activityOrFragment)) {
+                   Log.d("XXX", "FRAGMENT");
+                   view = getViewFromFragment(activityOrFragment, injectView);
+                } else if(activityOrFragment instanceof Activity) {
+                   Log.d("XXX", "ACTIVITY");
+                   view = getViewFromActivity((Activity)activityOrFragment, injectView);
+                } else if(activityOrFragment instanceof View) {
+                   Log.d("XXX", "VIEW");
+                   view = getViewFromView((View)activityOrFragment, injectView);
+                } else {
+                   Log.d("XXX", "FELL OFF END");
+                }
+                   
                 if (view == null && Nullable.notNullable(field))
                     throw new NullPointerException(String.format("Can't inject null value into %s.%s when field is not @Nullable", field.getDeclaringClass(), field.getName()));
 
@@ -198,6 +213,55 @@ public class ViewListener implements TypeListener {
                         field.getType(), field.getName()), f);
             }
         }
+
+       protected View getViewFromActivity(Activity activity, InjectView injectView) throws ClassNotFoundException, IllegalAccessException {
+          View ret = null;
+          final int id = injectView.value();
+          final String id_string = injectView.id();
+
+          if( id>=0 )
+             ret = activity.findViewById(id);
+          else if(!id_string.equals("") )
+             ret = activity.findViewById(getIdStringView(activity, id_string));
+          else 
+             ret = activity.getWindow().getDecorView().findViewWithTag(injectView.tag());
+          
+          return ret;
+       }
+
+       protected View getViewFromView(View view, InjectView injectView) throws ClassNotFoundException, IllegalAccessException {
+          Log.d("XXX", "getViewFromView");
+          View ret = null;
+          final int id = injectView.value();
+          final String id_string = injectView.id();
+
+          if( id>=0 )
+             ret = view.findViewById(id);
+
+          else if(!id_string.equals(""))
+             ret = view.findViewById(getIdStringView(view.getContext(), injectView.id()));
+          else 
+             ret = view.findViewWithTag(injectView.tag());
+
+          Log.d("XXX", "getViewFromView returning "+ret);
+
+          return ret;
+       }
+
+       protected View getViewFromFragment(Object fragment, InjectView injectView) throws ClassNotFoundException, IllegalAccessException, InvocationTargetException {
+          View ret = null;
+          final int id = injectView.value();
+          final String id_string = injectView.id();
+
+          if( id>=0 )
+             ret = ((View)fragmentGetViewMethod.invoke(fragment)).findViewById(id);
+          else if(!id_string.equals("") )
+             ret = activity.findViewById(getIdStringView(activity, id_string));
+          else 
+             ret = ((View)fragmentGetViewMethod.invoke(fragment)).findViewWithTag(injectView.tag());
+
+          return ret;
+       }
 
        protected int getIdStringView(Context context, String name) throws ClassNotFoundException, IllegalAccessException {
           String pkg = context.getPackageName();
@@ -261,12 +325,16 @@ public class ViewListener implements TypeListener {
 
         
         protected static void injectViews(Object activityOrFragment) {
+           Log.d("XXX", "injectViews");
             synchronized ( ViewMembersInjector.class ) {
 
                 final ArrayList<ViewMembersInjector<?>> injectors = viewMembersInjectors.get(activityOrFragment);
-                if(injectors!=null)
+                if(injectors!=null) {
+                Log.d("XXX", "we have "+injectors.size()+" injectors");
                     for(ViewMembersInjector<?> viewMembersInjector : injectors)
                         viewMembersInjector.reallyInjectMembers(activityOrFragment);
+                } else
+                   Log.d("XXX", "injectors are null");
             }
         }
 
