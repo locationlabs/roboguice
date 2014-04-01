@@ -77,7 +77,6 @@ public class RoboScrollView extends ScrollView implements RoboContext {
    }
 
    private void init(Context context) {
-      Log.d("XXX", "RoboScrollView init");
       final RoboInjector injector = RoboGuice.getInjector(getContext());
       eventManager = injector.getInstance(EventManager.class);
       injector.injectMembersWithoutViews(this);
@@ -87,7 +86,6 @@ public class RoboScrollView extends ScrollView implements RoboContext {
    @Override
    protected void onFinishInflate() {
       super.onFinishInflate();
-      Log.d("XXX", "onFinishInlfate");
       RoboGuice.getInjector(getContext()).injectViewMembers(this);
       eventManager.fire(new OnContentChangedEvent());
    }

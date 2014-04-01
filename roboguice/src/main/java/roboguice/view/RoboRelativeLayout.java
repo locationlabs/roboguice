@@ -74,7 +74,6 @@ public class RoboRelativeLayout extends android.widget.RelativeLayout implements
    }
    */
    private void init(Context context) {
-      Log.d("XXX", "RoboRelativeLayout init");
       final RoboInjector injector = RoboGuice.getInjector(getContext());
       eventManager = injector.getInstance(EventManager.class);
       injector.injectMembersWithoutViews(this);
@@ -84,7 +83,6 @@ public class RoboRelativeLayout extends android.widget.RelativeLayout implements
    @Override
    protected void onFinishInflate() {
       super.onFinishInflate();
-      Log.d("XXX", "onFinishInflate");
       RoboGuice.getInjector(getContext()).injectViewMembers(this);
       //eventManager.fire(new OnContentChangedEvent());
    }

@@ -269,7 +269,6 @@ public class ContextScopedRoboInjector implements RoboInjector {
         synchronized (ContextScope.class) {
             scope.enter(context);
             try {
-               Log.d("XXX", "injectViewMembers(View view)");
                 ViewMembersInjector.injectViews(view);
             } finally {
                 scope.exit(context);
